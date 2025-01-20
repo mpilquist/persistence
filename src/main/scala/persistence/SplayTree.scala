@@ -29,17 +29,23 @@ trait SplayTree[K: Ordering, V]:
   def values: Iterator[V] = iterator.map(_(1))
 
   def get(k: K): Option[(SplayTree[K, V], V)] =
+    getNode(k).map(n => n -> n.value)
+
+  private def getNode(k: K): Option[Node[K, V]] =
     def loop(t: SplayTree[K, V]): Option[List[Node[K, V]]] = t match
       case Empty() => None
-      case n @ Node(_, k2, v, _) if ordK.equiv(k, k2) => 
-        Some(List(n))
+      case n @ Node(_, k2, v, r) if ordK.equiv(k, k2) => 
+        // Search right tree for same key; ensures we always return right-most match
+        loop(r) match
+          case Some(p) => Some(n :: p)
+          case None => Some(List(n))
       case n @ Node(l, k2, _, _) if ordK.lt(k, k2) => 
         loop(l).map(n :: _)
       case n @ Node(_, _, _, r) => 
         loop(r).map(n :: _)
     loop(this).map: path =>
       val (target, ancestry) = shift(path)
-      splay(target, ancestry) -> target.value
+      splay(target, ancestry)
 
   def put(k: K, v: V): SplayTree[K, V] = splayPath(insert(k, v))
 
@@ -72,11 +78,11 @@ trait SplayTree[K: Ordering, V]:
 
     loop(path.tail, path.head, Nil)
 
-  private def splayPath(path: List[Node[K, V]]): SplayTree[K, V] =
+  private def splayPath(path: List[Node[K, V]]): Node[K, V] =
     val shifted = shift(path)
     splay(shifted(0), shifted(1))
 
-  private def splay(node: Node[K, V], ancestry: List[Either[Node[K, V], Node[K, V]]]): SplayTree[K, V] =
+  private def splay(node: Node[K, V], ancestry: List[Either[Node[K, V], Node[K, V]]]): Node[K, V] =
     ancestry match
       case Nil => node
 
@@ -125,6 +131,40 @@ trait SplayTree[K: Ordering, V]:
           Node(node.right, parent.key, parent.value, parent.right)
         )
         splay(newNode, tl)
+
+  def remove(k: K): SplayTree[K, V] =
+    getNode(k) match
+      case Some(Node(l, _, _, r)) =>
+        l.join(r)
+      case None => this
+
+  private def pathOfLargest: List[Node[K, V]] = this match
+    case Empty() => Nil
+    case n @ Node(_, _, _, r) => n :: r.pathOfLargest
+
+  /**
+   * Joins the supplied tree to this tree.
+   *
+   * Requires every entry in the supplied tree to be greater than or
+   * equal to all keys in this tree.
+   */
+  def join(that: SplayTree[K, V]): SplayTree[K, V] =
+    if size == 0 then that
+    else splayPath(pathOfLargest) match
+      case Node(l, k, v, Empty()) => Node(l, k, v, that)
+
+  /**
+   * Returns two disjoint subtrees, where the first tree contains all entries
+   * less than or equal to the supplied key and the second tree contains all
+   * entries greater than the supplied key.
+   */
+  def splitAt(k: K): (SplayTree[K, V], SplayTree[K, V]) =
+    getNode(k) match
+      case Some(Node(l, k, v, r)) =>
+        (Node(l, k, v, Empty()), r)
+      case None =>
+        val artificialRoot = splayPath(insert(k, null.asInstanceOf[V]))
+        (artificialRoot.left, artificialRoot.right)
 
 object SplayTree:
 

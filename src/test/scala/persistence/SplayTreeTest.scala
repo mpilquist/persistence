@@ -36,3 +36,21 @@ class SplayTreeTest extends ScalaCheckSuite:
       assertEquals(t2.entry, Some(x -> x))
     )
 
+  property("remove"):
+    Prop.forAll((t: SplayTree[Int, Int], n0: Int) =>
+      if t.size > 0 then
+        val n = (n0 % t.size).abs
+        val (k, v) = t.iterator.drop(n).toList.head
+        val t2 = t.remove(k)
+        assertEquals(t2.size, t.size - 1)
+    )
+
+  property("splitAt"):
+    Prop.forAll((t: SplayTree[Int, Int], k: Int) =>
+      val (pfx, sfx) = t.splitAt(k)
+      assertEquals(pfx.size + sfx.size, t.size)
+      val entries = t.iterator.toList
+      val (lpfx, lsfx) = entries.splitAt(entries.segmentLength(_(0) <= k))
+      assertEquals(pfx.iterator.toList.sorted, lpfx.sorted)
+      assertEquals(sfx.iterator.toList.sorted, lsfx.sorted)
+    )
