@@ -138,9 +138,29 @@ trait SplayTree[K: Ordering, V]:
         l.join(r)
       case None => this
 
-  private def pathOfLargest: List[Node[K, V]] = this match
+  def -(k: K): SplayTree[K, V] = remove(k)
+
+  def min: Option[(SplayTree[K, V], V)] =
+    val p = pathToMin
+    if p.isEmpty then None else Some(splayPath(p)).map(t => t -> t.value)
+
+  def peekMin: Option[V] =
+    pathToMin.lastOption.map(_.value)
+
+  private def pathToMin: List[Node[K, V]] = this match
     case Empty() => Nil
-    case n @ Node(_, _, _, r) => n :: r.pathOfLargest
+    case n @ Node(l, _, _, _) => n :: l.pathToMin
+
+  def max: Option[(SplayTree[K, V], V)] =
+    val p = pathToMax
+    if p.isEmpty then None else Some(splayPath(p)).map(t => t -> t.value)
+
+  def peekMax: Option[V] =
+    pathToMax.lastOption.map(_.value)
+
+  private def pathToMax: List[Node[K, V]] = this match
+    case Empty() => Nil
+    case n @ Node(_, _, _, r) => n :: r.pathToMax
 
   /**
    * Joins the supplied tree to this tree.
@@ -150,7 +170,7 @@ trait SplayTree[K: Ordering, V]:
    */
   def join(that: SplayTree[K, V]): SplayTree[K, V] =
     if size == 0 then that
-    else splayPath(pathOfLargest) match
+    else splayPath(pathToMax) match
       case Node(l, k, v, Empty()) => Node(l, k, v, that)
 
   /**
@@ -168,7 +188,8 @@ trait SplayTree[K: Ordering, V]:
 
 object SplayTree:
 
-  private case class Empty[K: Ordering, V]() extends SplayTree[K, V]
+  private case class Empty[K: Ordering, V]() extends SplayTree[K, V]:
+    override def toString: String = "Empty"
 
   private case class Node[K: Ordering, V](
     left: SplayTree[K, V],
@@ -176,7 +197,6 @@ object SplayTree:
     value: V,
     right: SplayTree[K, V]
   ) extends SplayTree[K, V]
-
 
   def empty[K: Ordering, V]: SplayTree[K, V] = Empty()
 
